@@ -1,0 +1,9 @@
+aiohttp
+fastapi
+pycryptodome
+pydantic
+uvicorn
+httpx
+openai
+pyjwt
+loguru
