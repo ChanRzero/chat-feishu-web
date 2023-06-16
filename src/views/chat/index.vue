@@ -149,9 +149,9 @@ async function executeUpdateChat(index, msgArr, chunk, message, options, resInde
         requestOptions: { prompt: message, options: { ...options }, role: 'assistant' },
       },
     )
+    scrollToBottom()
   }
 
-  scrollToBottom()
   setTimeout(() => {
     executeUpdateChat(index + 1, msgArr, chunk, message, options, resIndex)
   }, 30)
@@ -372,7 +372,6 @@ async function onRegenerate(index: number) {
               requestOptions: { prompt: message, options: { ...options }, role: 'assistant' },
             },
           )
-          scrollToBottom()
           return
         }
         // SSE response format "data: xxx"
@@ -386,7 +385,6 @@ async function onRegenerate(index: number) {
     })
     const i = 0
     await executeUpdateChat(i, msgData, chunk, message, options, index)
-    scrollToBottom()
   }
   catch (error: any) {
     if (error.message === 'canceled') {
