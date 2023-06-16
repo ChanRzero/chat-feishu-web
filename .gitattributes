@@ -15,3 +15,4 @@
 "*.sass"   eol=lf
 "*.styl"   eol=lf
 "*.md"     eol=lf
+"*.py"     eol=lf
