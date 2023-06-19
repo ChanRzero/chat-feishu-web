@@ -98,15 +98,23 @@ function andMsgCeche(str: string) {
     .split('data:')
     .filter(Boolean)
     .map((msg) => { return JSON.parse(JSON.stringify(`${msg}`)) })
-  const msgs = []
-  messages.forEach((msg) => {
-    msgs.push(JSON.parse(msg).text)
-  })
+  // const msgs = []
+  // messages.forEach((msg) => {
+  //   msgs.push(JSON.parse(msg).text)
+  // })
+  const msgs = messages.map(e => JSON.parse(`${e}`).text)
 
   return msgs
 }
 
 async function executeUpdateChat(index, msgArr, chunk, message, options, resIndex) {
+  if (index === msgArr.length - 1) {
+    loading.value = false
+    return
+  }
+  if (loading.value === false)
+    return
+
   if (index >= msgArr.length) {
     scrollToBottom()
     return
@@ -154,7 +162,7 @@ async function executeUpdateChat(index, msgArr, chunk, message, options, resInde
 
   setTimeout(() => {
     executeUpdateChat(index + 1, msgArr, chunk, message, options, resIndex)
-  }, 30)
+  }, 20)
 }
 
 async function onConversation() {
@@ -181,7 +189,6 @@ async function onConversation() {
     },
   )
   scrollToBottom()
-
   loading.value = true
   prompt.value = ''
 
@@ -268,6 +275,7 @@ async function onConversation() {
         },
       )
       scrollToBottom()
+      loading.value = false
       return
     }
 
@@ -283,6 +291,7 @@ async function onConversation() {
           loading: false,
         },
       )
+      loading.value = false
       return
     }
     updateChat(
@@ -300,10 +309,8 @@ async function onConversation() {
         requestOptions: { prompt: message, options: { ...options },	role: 'assistant' },
       },
     )
-    scrollToBottom()
-  }
-  finally {
     loading.value = false
+    scrollToBottom()
   }
 }
 
@@ -372,6 +379,7 @@ async function onRegenerate(index: number) {
               requestOptions: { prompt: message, options: { ...options }, role: 'assistant' },
             },
           )
+          loading.value = false
           return
         }
         // SSE response format "data: xxx"
@@ -395,6 +403,7 @@ async function onRegenerate(index: number) {
           loading: false,
         },
       )
+      loading.value = false
       return
     }
 
@@ -414,8 +423,6 @@ async function onRegenerate(index: number) {
         requestOptions: { prompt: message, options: { ...options }, role: 'assistant' },
       },
     )
-  }
-  finally {
     loading.value = false
   }
 }
@@ -615,7 +622,7 @@ onUnmounted(() => {
                 @delete="handleDelete(index)"
               />
               <div class="sticky bottom-0 left-0 flex justify-center">
-                <NButton v-if="loading" type="warning" @click="handleStop">
+                <NButton v-if="loading" type="Error" @click="handleStop">
                   <template #icon>
                     <SvgIcon icon="ri:stop-circle-line" />
                   </template>
