@@ -5,13 +5,16 @@ import time
 from fastapi import FastAPI, Request, APIRouter, Response, Depends
 from fastapi.responses import StreamingResponse
 from loguru import logger
+from openai.error import APIConnectionError
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, AsyncGenerator
 from api.auth import parse_payload
 from api.models import azureOpenAI
 from api.models.azureOpenAI import stream_completions_turbo, StreamMessageTurbo, MessageTurbo, web_completions_turbo
 import json
+
+from sse_starlette.sse import ServerSentEvent, EventSourceResponse
 
 router = APIRouter()
 
@@ -20,6 +23,7 @@ router = APIRouter()
 stream_response_headers = {
     "Cache-Control": "no-cache",
     "Connection": "keep-alive",
+    "Keep-Alive": "timeout=4",
 }
 
 
@@ -110,11 +114,12 @@ async def chat_process(request: Request, request_props: RequestProps, token_data
     return result
 
 
-# TODO 目前接口返回的sse事件流，未能实现每个流逐一响应，出现集中响应现象，导致消息总体响应效率慢。虽然此接口仍与前端实现了打印机效果，但是并没有实质性的提高效率。
-#      原因：可能由于服务器缓存或者其他关系，需进一步优化
+
+
+
 # web后端-流式接口
 @router.post('/chat-process')
-async def chat_process_test(request: Request, request_props: RequestProps, token_data=Depends(parse_payload)):
+async def chat_process_stream(request: Request, request_props: RequestProps, token_data=Depends(parse_payload)):
     result = msgResponse()
     if not token_data['status']:
         result.status = False
@@ -144,10 +149,9 @@ async def chat_process_test(request: Request, request_props: RequestProps, token
 
     messages.append({'role': 'user', 'content': prompt})
     # 生成聊天消息
-
     answer_text = chat_reply_process(messages, temperature, top_p)
 
-    return StreamingResponse(content=answer_text, headers=stream_response_headers, media_type="text/event-stream")
+    return EventSourceResponse(content=answer_text, headers=stream_response_headers, media_type="text/event-stream")
 
 
 # 聊天处理函数
@@ -156,32 +160,38 @@ async def chat_reply_process(message, temperature, top_p):
     messages = StreamMessageTurbo(prompt=message, temperature=temperature, top_p=top_p)
     try:
         res = await stream_completions_turbo(messages)
-    except Exception as e:
+        text = ""
+        role = ""
+        for openai_object in res:
+            openai_object_dict = openai_object.to_dict_recursive()
+
+            if not role:
+                role = openai_object_dict["choices"][0]["delta"].get("role", "")
+
+            text_delta = openai_object_dict["choices"][0]["delta"].get("content", "")
+            text += text_delta
+            message = json.dumps(dict(
+                role=role,
+                id=openai_object_dict["id"],
+                text=text,
+                delta=text_delta,
+                # detail=dict(
+                #     id=openai_object_dict["id"],
+                #     object=openai_object_dict["object"],
+                #     created=openai_object_dict["created"],
+                #     model=openai_object_dict["model"],
+                #     choices=openai_object_dict["choices"]
+                #  )
+            ))
+            time.sleep(0.025)  # 由于响应速度过快，导致前端直接读取的打字机效果不明显，所以延时了一下
+            yield "data:" + message
+    except APIConnectionError as e:
         logger.info(e)
-        yield "{'status': False, 'data': None, 'message': '出错了，请稍后重试！！！'}"
-        return
+        s = "出错了，请稍后重试！！！"
+        for i in range(len(s)):
+            r = msgResponse()
+            r.message = s[:i + 1]
+            r.status = False
+            r.data = 'error'
+            yield r
 
-    text = ""
-    role = ""
-    for openai_object in res:
-        openai_object_dict = openai_object.to_dict_recursive()
-
-        if not role:
-            role = openai_object_dict["choices"][0]["delta"].get("role", "")
-
-        text_delta = openai_object_dict["choices"][0]["delta"].get("content", "")
-        text += text_delta
-        message = json.dumps(dict(
-            role=role,
-            id=openai_object_dict["id"],
-            text=text,
-            delta=text_delta,
-            # detail=dict(
-            #     id=openai_object_dict["id"],
-            #     object=openai_object_dict["object"],
-            #     created=openai_object_dict["created"],
-            #     model=openai_object_dict["model"],
-            #     choices=openai_object_dict["choices"]
-            #  )
-        ))
-        yield "data:" + message
