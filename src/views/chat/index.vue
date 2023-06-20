@@ -57,7 +57,10 @@ dataSources.value.forEach((item, index) => {
 
 function isServerError(str: any) {
   if (str && str.startsWith('data:')) {
-    return false
+    if (str.includes('error'))
+      return true
+    else
+      return false
   }
   else {
     const responseText: Chat.errorRespose = JSON.parse(str)
@@ -71,20 +74,20 @@ function handleSubmit() {
   onConversation()
 }
 
-function removeFirstNonDataPrefix(str: string): string {
-  const dataPrefix = 'data:'
-  if (str.startsWith(dataPrefix)) {
-    return str
-  }
-  else {
-    const index = str.indexOf(dataPrefix)
-    if (index === -1)
-      return str
+// function removeFirstNonDataPrefix(str: string): string {
+//   const dataPrefix = 'data:'
+//   if (str.startsWith(dataPrefix)) {
+//     return str
+//   }
+//   else {
+//     const index = str.indexOf(dataPrefix)
+//     if (index === -1)
+//       return str
 
-    else
-      return str.slice(0, index) + str.slice(index + dataPrefix.length)
-  }
-}
+//     else
+//       return str.slice(0, index) + str.slice(index + dataPrefix.length)
+//   }
+// }
 
 function removeDataPrefix(str: string) {
   if (str && str.startsWith('data:'))
@@ -93,77 +96,77 @@ function removeDataPrefix(str: string) {
   return str
 }
 
-function andMsgCeche(str: string) {
-  const messages: Chat.ChatMessage[] = str
-    .split('data:')
-    .filter(Boolean)
-    .map((msg) => { return JSON.parse(JSON.stringify(`${msg}`)) })
-  // const msgs = []
-  // messages.forEach((msg) => {
-  //   msgs.push(JSON.parse(msg).text)
-  // })
-  const msgs = messages.map(e => JSON.parse(`${e}`).text)
+// function andMsgCeche(str: string) {
+//   const messages: Chat.ChatMessage[] = str
+//     .split('data:')
+//     .filter(Boolean)
+//     .map((msg) => { return JSON.parse(JSON.stringify(`${msg}`)) })
+//   // const msgs = []
+//   // messages.forEach((msg) => {
+//   //   msgs.push(JSON.parse(msg).text)
+//   // })
+//   const msgs = messages.map(e => JSON.parse(`${e}`).text)
 
-  return msgs
-}
+//   return msgs
+// }
 
-async function executeUpdateChat(index, msgArr, chunk, message, options, resIndex) {
-  if (index === msgArr.length - 1) {
-    loading.value = false
-    return
-  }
-  if (loading.value === false)
-    return
+// async function executeUpdateChat(index, msgArr, chunk, message, options, resIndex) {
+//   if (index === msgArr.length - 1) {
+//     loading.value = false
+//     return
+//   }
+//   if (loading.value === false)
+//     return
 
-  if (index >= msgArr.length) {
-    scrollToBottom()
-    return
-  }
+//   if (index >= msgArr.length) {
+//     scrollToBottom()
+//     return
+//   }
 
-  const str = msgArr[index]
+//   const str = msgArr[index]
 
-  const data = JSON.parse(chunk)
+//   const data = JSON.parse(chunk)
 
-  if (resIndex) {
-    updateChat(
-      +uuid,
-      resIndex,
-      {
-        msgCache: [],
-        dateTime: new Date().toLocaleString(),
-        text: str ?? ' ',
-        inversion: false,
-        error: false,
-        loading: false,
-        role: 'assistant',
-        conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
-        requestOptions: { prompt: message, options: { ...options }, role: 'assistant' },
-      },
-    )
-  }
-  else {
-    updateChat(
-      +uuid,
-      dataSources.value.length - 1,
-      {
-        msgCache: [],
-        dateTime: new Date().toLocaleString(),
-        text: str ?? ' ',
-        inversion: false,
-        error: false,
-        loading: false,
-        role: 'assistant',
-        conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
-        requestOptions: { prompt: message, options: { ...options }, role: 'assistant' },
-      },
-    )
-    scrollToBottom()
-  }
+//   if (resIndex) {
+//     updateChat(
+//       +uuid,
+//       resIndex,
+//       {
+//         msgCache: [],
+//         dateTime: new Date().toLocaleString(),
+//         text: str ?? ' ',
+//         inversion: false,
+//         error: false,
+//         loading: false,
+//         role: 'assistant',
+//         conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
+//         requestOptions: { prompt: message, options: { ...options }, role: 'assistant' },
+//       },
+//     )
+//   }
+//   else {
+//     updateChat(
+//       +uuid,
+//       dataSources.value.length - 1,
+//       {
+//         msgCache: [],
+//         dateTime: new Date().toLocaleString(),
+//         text: str ?? ' ',
+//         inversion: false,
+//         error: false,
+//         loading: false,
+//         role: 'assistant',
+//         conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
+//         requestOptions: { prompt: message, options: { ...options }, role: 'assistant' },
+//       },
+//     )
+//     scrollToBottom()
+//   }
 
-  setTimeout(() => {
-    executeUpdateChat(index + 1, msgArr, chunk, message, options, resIndex)
-  }, 20)
-}
+//   setTimeout(() => {
+//     executeUpdateChat(index + 1, msgArr, chunk, message, options, resIndex)
+//   }, 20)
+// }
 
 async function onConversation() {
   const message = prompt.value
@@ -219,9 +222,6 @@ async function onConversation() {
   )
   scrollToBottom()
 
-  let msgData
-  let chunk
-
   try {
     await fetchChatAPIProcess<Chat.ConversationResponse>({
 		  prompt: message,
@@ -239,7 +239,7 @@ async function onConversation() {
             {
               msgCache: [],
               dateTime: new Date().toLocaleString(),
-              text: responseText.message,
+              text: '出错了，请稍后重试！！！',
               inversion: false,
               error: true,
               loading: false,
@@ -250,18 +250,32 @@ async function onConversation() {
           scrollToBottom()
           return
         }
+
         // SSE response format "data: xxx"
         const lastIndex = responseText.lastIndexOf('data:')
-        chunk = responseText
+        let chunk = responseText
         if (lastIndex !== -1)
           chunk = responseText.substring(lastIndex)
-        msgData = andMsgCeche(responseText)
         chunk = removeDataPrefix(chunk)
+        const data = JSON.parse(chunk)
+        updateChat(
+          +uuid,
+          dataSources.value.length - 1,
+          {
+            msgCache: [],
+            dateTime: new Date().toLocaleString(),
+            text: data.text ?? ' ',
+            inversion: false,
+            error: false,
+            loading: false,
+            role: 'assistant',
+            conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
+            requestOptions: { prompt: message, options: { ...options }, role: 'assistant' },
+          },
+        )
+        scrollToBottom()
       },
     })
-    const index = 0
-    await executeUpdateChat(index, msgData, chunk, message, options, false)
-    scrollToBottom()
   }
   catch (error: any) {
     const errorMessage = error?.message ?? t('common.wrong')
@@ -275,7 +289,6 @@ async function onConversation() {
         },
       )
       scrollToBottom()
-      loading.value = false
       return
     }
 
@@ -291,7 +304,7 @@ async function onConversation() {
           loading: false,
         },
       )
-      loading.value = false
+      scrollToBottom()
       return
     }
     updateChat(
@@ -309,8 +322,10 @@ async function onConversation() {
         requestOptions: { prompt: message, options: { ...options },	role: 'assistant' },
       },
     )
-    loading.value = false
     scrollToBottom()
+  }
+  finally {
+    loading.value = false
   }
 }
 
@@ -352,8 +367,6 @@ async function onRegenerate(index: number) {
     },
   )
 
-  let msgData
-  let chunk
   try {
     await fetchChatAPIProcess<Chat.ConversationResponse>({
 		  prompt: message,
@@ -371,7 +384,7 @@ async function onRegenerate(index: number) {
             {
               msgCache: [],
               dateTime: new Date().toLocaleString(),
-              text: responseText.message,
+              text: '出错了，请稍后重试！！！',
               inversion: false,
               error: true,
               loading: false,
@@ -379,20 +392,33 @@ async function onRegenerate(index: number) {
               requestOptions: { prompt: message, options: { ...options }, role: 'assistant' },
             },
           )
-          loading.value = false
           return
         }
+
         // SSE response format "data: xxx"
         const lastIndex = responseText.lastIndexOf('data:')
-        chunk = responseText
+        let chunk = responseText
         if (lastIndex !== -1)
           chunk = responseText.substring(lastIndex)
-        msgData = andMsgCeche(responseText)
         chunk = removeDataPrefix(chunk)
+        const data = JSON.parse(chunk)
+        updateChat(
+          +uuid,
+          index,
+          {
+            msgCache: [],
+            dateTime: new Date().toLocaleString(),
+            text: data.text ?? ' ',
+            inversion: false,
+            error: false,
+            loading: false,
+            role: 'assistant',
+            conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
+            requestOptions: { prompt: message, options: { ...options }, role: 'assistant' },
+          },
+        )
       },
     })
-    const i = 0
-    await executeUpdateChat(i, msgData, chunk, message, options, index)
   }
   catch (error: any) {
     if (error.message === 'canceled') {
@@ -403,7 +429,6 @@ async function onRegenerate(index: number) {
           loading: false,
         },
       )
-      loading.value = false
       return
     }
 
@@ -423,6 +448,8 @@ async function onRegenerate(index: number) {
         requestOptions: { prompt: message, options: { ...options }, role: 'assistant' },
       },
     )
+  }
+  finally {
     loading.value = false
   }
 }
