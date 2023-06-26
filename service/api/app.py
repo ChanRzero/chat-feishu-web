@@ -122,7 +122,7 @@ async def chat_process(request: Request, request_props: RequestProps, token_data
 async def chat_process_stream(request: Request, request_props: RequestProps, token_data=Depends(parse_payload)):
     result = msgResponse()
     if not token_data['status']:
-        result.status = False
+        result.status = True
         result.message = token_data['message']
         logger.warning('请求ip:' + request.client.host + '。token认证失败，拒绝访问模型接口')
         return result
