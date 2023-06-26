@@ -39,7 +39,7 @@ bearer_scheme = HTTPBearer()
 # 定义一个依赖项函数，用于从请求头中获取 token 并进行验证
 def parse_payload(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
     token = credentials.credentials
-    result = {'status': True, 'data': None, 'message': None}
+    result = {'status': False, 'data': None, 'message': None}
     if token == "token":
         result['message'] = 'token不能为空，请在【设置】中填写保存正确的token \n\n `在飞书机器人中,发送"token",获取正确的token`'
         logger.info("token为空！")
