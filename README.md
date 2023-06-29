@@ -222,7 +222,7 @@ pnpm build
 
 在`nginx.conf`中的**http**内加入以下配置
 
-```json
+```
 server
 	{
 	 	listen 8081;  # 监听8081端口
