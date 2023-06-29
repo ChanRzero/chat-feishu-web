@@ -1,3 +1,7 @@
+
+
+
+
 ![cover](./docs/c1.png)
 ![cover2](./docs/c2.png)
 
@@ -13,42 +17,42 @@
 
 该项目基于Azure OpenAI 进行实现
 
-| 功能                                        | 特点 | 可拓展性  |
-| --------------------------------------------- | ------ | ---------- |
-| `Web端聊天页面`                  | 支持Markdown格式；响应消息呈现打字机效果；可以给模型赋予角色 | 较低     |
-| `飞书机器人` | 仅支持文本格式；响应消息集中返回，速度较快； | 较高，可以结合飞书的功能进行许多新的功能拓展。 |
+| 功能            | 特点                                                         | 可拓展性                                       |
+| --------------- | ------------------------------------------------------------ | ---------------------------------------------- |
+| `Web端聊天页面` | 支持Markdown格式；响应消息呈现打字机效果；可以给模型赋予角色 | 较低                                           |
+| `飞书机器人`    | 仅支持文本格式；响应消息集中返回，速度较快；                 | 较高，可以结合飞书的功能进行许多新的功能拓展。 |
 
-本项目Web前端页面是基于 [chatgpt-web](https://github.com/Chanzhaoyu/chatgpt-web) 的二次开发
 
 #### 环境变量：
 
 全部参数变量请查看或[这里](#环境变量)
 
 ```
-/service/.env.example.json
+后端： /service/.env.example.json
+前端： /.env
 ```
 
 ## 待实现路线
 
-[✓] web端打字机聊天效果
+✅web端打字机聊天效果
 
-[✓] 多会话储存和上下文逻辑
+✅ 多会话储存和上下文逻辑
 
-[✓] 飞书指定消息作为上下文
+✅飞书指定消息作为上下文
 
-[✓] 对代码等消息类型的格式化美化处理
+✅对代码等消息类型的格式化美化处理
 
-[✓] 访问权限控制
+✅访问权限控制
 
-[✓] 数据导入、导出
+✅ 数据导入、导出
 
-[✓] 保存消息到本地图片
+✅保存消息到本地图片
 
-[✓] 界面多语言
+✅界面多语言
 
-[✓] 界面主题
+✅界面主题
 
-[✗] More...
+❎ More...
 
 
 
@@ -111,7 +115,9 @@ node -v
 ```
 
 ### PNPM
+
 如果你没有安装过 `pnpm`
+
 ```shell
 npm install pnpm -g
 ```
@@ -137,13 +143,22 @@ pip install -r requirements.txt
 ```
 
 ### 前端
+
 根目录下运行以下命令
+
 ```shell
 pnpm bootstrap
 ```
 
 ## 测试环境运行
+
 ### 后端服务
+
+配置`/service/main.py`
+
+```python
+config = uvicorn.Config("main:app",host='127.0.0.1', port=3002, log_level="info")    # host：本地ip,如果是公网ip则设置为‘0.0.0.0’，port：后端服务端口号
+```
 
 进入文件夹 `/service` 运行以下命令
 
@@ -152,7 +167,17 @@ python main.py
 ```
 
 ### 前端网页
+
 根目录下运行以下命令
+
+配置`.env`
+
+```
+VITE_APP_API_BASE_URL= http://127.0.0.1:3002/     对应后端ip和端口
+```
+
+在根目录下
+
 ```shell
 pnpm dev
 ```
@@ -193,10 +218,50 @@ Azure openAI相关变量：
 pnpm build
 ```
 
+##### Nginx配置
+
+在`nginx.conf`中的**http**内加入以下配置
+
+```json
+server
+	{
+	 	listen 8081;  # 监听8081端口
+	 	server_name _; 
+	 	root /home/ubuntu/ChatBot/dist/;       #打包的dist路径 
+	 	# 防止爬虫抓取
+		if ($http_user_agent ~* "360Spider|JikeSpider|Spider|spider|bot|Bot|2345Explorer|curl|wget|webZIP|qihoobot|Baiduspider|Googlebot|Googlebot-Mobile|Googlebot-Image|Mediapartners-Google|Adsbot-Google|Feedfetcher-Google|Yahoo! Slurp|Yahoo! Slurp China|YoudaoBot|Sosospider|Sogou spider|Sogou web spider|MSNBot|ia_archiver|Tomato Bot|NSPlayer|bingbot")
+		{
+			return 403;
+		}
+	       	#禁止访问的文件或目录
+		 location ~ ^/(\.user.ini|\.htaccess|\.git|\.svn|\.project|LICENSE|README.md)				     
+		 {
+       			 return 404;
+	       	}
+   		location / {
+	        #解决（直接通过ip+路径访问出错，只能在网页内跳转）问题
+	        try_files $uri $uri/ /index.html;
+	       	}
+    	location /api/ {
+	        proxy_pass http://0.0.0.0:3002/;              #后端服务，如果和后端在同个服务器则不用修改，如果不同服务器，则修改为实际ip+端口
+			proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+	       	}
+	}
+```
+
 #### 后端服务
 
-1、后端目前无需打包，在系统中挂起运行即可，进入`/service`，其中log.log为运行日志文件
+1、配置`/service/main.py`
+
+```
+config = uvicorn.Config("main:app",host='0.0.0.0', port=3002, log_level="info")    # ‘0.0.0.0’运行后，为 服务器公网ip+3002
+```
+
+后端服务对外暴露目的是为了让飞书接入，可以通过白名单添加飞书的请求ip  [参考文档](https://www.feishu.cn/hc/zh-CN/articles/237645168094-%E9%9B%86%E6%88%90%E5%B9%B3%E5%8F%B0-ip-%E7%99%BD%E5%90%8D%E5%8D%95)
+
+2、后端目前无需打包，在系统中挂起运行即可，进入`/service`，其中log.log为运行日志文件
 
 ```shell
  nohup python3 main.py >> log.log 2>&1 &
 ```
+
