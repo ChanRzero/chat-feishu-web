@@ -9,9 +9,9 @@ import os
 
 from loguru import logger
 
-from api.auth import create_token, UserInfo
-from api.models import chatGPT, azureOpenAI
-from api.models.azureOpenAI import MessageTurbo
+from service.api.auth import create_token, UserInfo
+from service.api.models import chatGPT, azureOpenAI
+from service.api.models.azureOpenAI import MessageTurbo
 
 from pydantic import BaseModel
 from fastapi import FastAPI, Request, BackgroundTasks, APIRouter
