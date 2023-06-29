@@ -9,9 +9,9 @@ from openai.error import APIConnectionError
 
 from pydantic import BaseModel, Field
 from typing import Optional, AsyncGenerator
-from api.auth import parse_payload
-from api.models import azureOpenAI
-from api.models.azureOpenAI import stream_completions_turbo, StreamMessageTurbo, MessageTurbo, web_completions_turbo
+from service.api.auth import parse_payload
+from service.api.models import azureOpenAI
+from service.api.models.azureOpenAI import stream_completions_turbo, StreamMessageTurbo, MessageTurbo, web_completions_turbo
 import json
 
 from sse_starlette.sse import ServerSentEvent, EventSourceResponse
