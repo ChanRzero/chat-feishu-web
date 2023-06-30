@@ -9,9 +9,9 @@ import os
 
 from loguru import logger
 
-from service.api.auth import create_token, UserInfo
-from service.api.models import chatGPT, azureOpenAI
-from service.api.models.azureOpenAI import MessageTurbo
+from api.auth import create_token, UserInfo
+from api.models import chatGPT, azureOpenAI
+from api.models.azureOpenAI import MessageTurbo
 
 from pydantic import BaseModel
 from fastapi import FastAPI, Request, BackgroundTasks, APIRouter
@@ -34,7 +34,7 @@ if app_id is None or app_secret is None or verification_token is None or encrypt
         encryption_key = encryption_key or config.get('feishu_encryption_key')
 
 
-class AESCipher(object):  # AES加密
+class AESCipher(object):  # AES加密 ，对encryption_key进行解密
     def __init__(self, key):
         self.bs = AES.block_size
         self.key = hashlib.sha256(AESCipher.str_to_bytes(key)).digest()
@@ -82,7 +82,9 @@ class TokenManager():  # 飞书token管理
         return self.token
 
 
-class FeishuUserInfo():  # 获取飞书中的用户基本信息用户名,头像;涉及隐私问题,暂时未使用
+# TODO 获取飞书中的用户基本信息用户名,头像; 涉及隐私问题,暂时未使用
+#      可以实现一些小功能，例如可以将用户名和头像信息放入token中，web端配置token时同步头像和用户名
+class FeishuUserInfo():  # 获取飞书用户信息
     def __init__(self, user_id) -> None:
         self.token_manager = token_manager
         self.url = "https://open.feishu.cn/open-apis/contact/v3/users/"
@@ -118,7 +120,7 @@ class FeishuUserInfo():  # 获取飞书中的用户基本信息用户名,头像;
         return result
 
 
-class LarkMsgSender():  # 飞书消息发送
+class MsgSender():  # 飞书消息发送
     def __init__(self, token_manager: TokenManager) -> None:
         self.prefix = "https://open.feishu.cn/open-apis/im/v1/messages/"
         self.suffix = "/reply"
@@ -192,8 +194,9 @@ class HistoryMessages():
                     new_item['role'] = 'assistant'
                 else:
                     new_item['role'] = item['sender_type']
-                new_item['content'] = json.loads(item['content'])['text']
-                new_data.append(new_item)
+                if 'content' in item and 'text' in item['content']:
+                    new_item['content'] = json.loads(item['content'])['text']
+                    new_data.append(new_item)
             return new_data
         else:
             print("获取上下文失败")
@@ -231,9 +234,10 @@ class getTheMessage:
 cipher = AESCipher(encryption_key)
 users_info = {}
 token_manager = TokenManager(app_id=app_id, app_secret=app_secret)
-sender = LarkMsgSender(token_manager)
+sender = MsgSender(token_manager)
 
 
+# TODO
 async def completions_turbo(input: dict):
     """Get completions for the message."""
     content = None
@@ -248,10 +252,14 @@ async def completions_turbo(input: dict):
             content = json.loads(input['event']['message']['content'])
             if 'text' not in content:
                 reply = "抱歉，我只能接收文本消息哦"
-            if content['text'] == 'token':
-                userInfo = UserInfo(name='User', avatar_url=' ')
-                token = create_token(userInfo)
-                reply = '您的token: 【' + token + '】，有效期为7天。\n请注意保管好您的token,切勿泄露他人。'
+                # 获取token
+            else:
+                if content['text'] == 'token':
+                    # TODO 存放用户信息到token
+                    userInfo = UserInfo(name='User', avatar_url='avatar_url')
+                    # 创建token
+                    token = create_token(userInfo)
+                    reply = '您的token: 【' + token + '】，有效期为7天。\n请注意保管好您的token,切勿泄露他人。'
         except ValueError:
             reply = "消息格式错误"
     if reply != "":
@@ -278,10 +286,10 @@ async def completions_turbo(input: dict):
             logger.info("模型请求失败", e)
     # 新消息，将历史消息作为上下文
     else:
-        # 获取5分钟前的时间戳
+        # 获取10分钟前的时间戳
         timestamp = int(input["event"]["message"]["create_time"])  # 给定时间戳
         dt = datetime.datetime.fromtimestamp(timestamp / 1000)  # 将时间戳转换为 datetime 对象
-        ago = dt - datetime.timedelta(minutes=10)  # 计算5分钟前的时间
+        ago = dt - datetime.timedelta(minutes=10)  # 计算10分钟前的时间
         start_time = int(ago.timestamp())  # 将时间转换为时间戳
         now = dt - datetime.timedelta(seconds=1)  # 计算1秒前的时间
         end_time = int(now.timestamp())  # 将时间转换为时间戳
@@ -294,7 +302,7 @@ async def completions_turbo(input: dict):
         # 给机器人知道当前时间
         now = datetime.datetime.now()
         formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
-        messages = [{'role': 'system', 'content': '你是一个基于gpt-3.5-turbo模型的聊天机器人'}]
+        messages = [{'role': 'system', 'content': 'You are ChatGPT, a large language model trained by OpenAI.'}]
         newMessage = content['text']
         if his_messages is not None:
             his_messages = [{'role': item['role'], 'content': item['content'][:300]
@@ -334,10 +342,15 @@ async def process(message: LarkMsgType, request: Request, background_tasks: Back
     if 'challenge' in plaintext:  # url verification
         return {'challenge': plaintext['challenge']}
 
-    message_id = plaintext['event']['message']['message_id']
-    if message_id not in processed_message_ids:
-        # 将message_id加入到已处理列表，避免下次重复处理
-        processed_message_ids.add(message_id)
-        background_tasks.add_task(completions_turbo, plaintext)  # reply in background
+    if 'event' in plaintext and 'message' in plaintext['event'] and 'message_id' in plaintext['event']['message']:
+        message_id = plaintext['event']['message']['message_id']
+        if message_id not in processed_message_ids:
+            # 将message_id加入到已处理列表，避免下次重复处理,并且为了避免内存溢出问题，当set达到20，则删除掉
+            if len(processed_message_ids) > 20:
+                for _ in range(len(processed_message_ids) - 20):
+                    processed_message_ids.pop()
+            processed_message_ids.add(message_id)
+
+            background_tasks.add_task(completions_turbo, plaintext)  # reply in background
 
     return {'message': 'ok'}  # 接受到消息后，立即返回ok，避免客户端重试
