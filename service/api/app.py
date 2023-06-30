@@ -9,9 +9,9 @@ from openai.error import APIConnectionError
 
 from pydantic import BaseModel, Field
 from typing import Optional, AsyncGenerator
-from service.api.auth import parse_payload
-from service.api.models import azureOpenAI
-from service.api.models.azureOpenAI import stream_completions_turbo, StreamMessageTurbo, MessageTurbo, web_completions_turbo
+from api.auth import parse_payload
+from api.models import azureOpenAI
+from api.models.azureOpenAI import stream_completions_turbo, StreamMessageTurbo, MessageTurbo, web_completions_turbo
 import json
 
 from sse_starlette.sse import ServerSentEvent, EventSourceResponse
@@ -162,7 +162,7 @@ async def chat_reply_process(message, temperature, top_p):
         res = await stream_completions_turbo(messages)
         text = ""
         role = ""
-        for openai_object in res:
+        async for openai_object in res:
             openai_object_dict = openai_object.to_dict_recursive()
 
             if not role:
@@ -183,7 +183,7 @@ async def chat_reply_process(message, temperature, top_p):
                 #     choices=openai_object_dict["choices"]
                 #  )
             ))
-            time.sleep(0.025)  # 由于响应速度过快，导致前端直接读取的打字机效果不明显，所以延时了一下
+            time.sleep(0.015)  # 由于响应速度过快，导致前端直接读取的打字机效果不明显，所以延时了一下
             yield "data:" + message
     except APIConnectionError as e:
         logger.info(e)
