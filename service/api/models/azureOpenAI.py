@@ -15,6 +15,7 @@ API_KEY = os.environ.get('gpt_app_key')
 api_type = os.environ.get('azure_api_type')
 api_base = os.environ.get('azure_api_base')
 api_version = os.environ.get('azure_api_version')
+aip_engine = os.environ.get('azure_engine')
 
 
 # 如果环境变量为空，则从 .env.json 文件中读取
@@ -25,6 +26,7 @@ if API_KEY is None or api_type is None or api_base is None or api_version is Non
         openai.api_type = api_type or config.get('azure_api_type')
         openai.api_base = api_base or config.get('azure_api_base')
         openai.api_version = api_version or config.get('azure_api_version')
+        aip_engine = aip_engine or config.get('azure_engine')
 
 
 class MessageTurbo(BaseModel):
@@ -49,8 +51,8 @@ class StreamMessageTurbo(BaseModel):
 
 
 async def get_response_turbo(message):
-    response = openai.ChatCompletion.create(
-        engine="gpt35-turbo",
+    response = await openai.ChatCompletion.acreate(
+        engine=aip_engine,
         messages=message.messages,
         temperature=message.temperature,
         max_tokens=message.max_tokens,
@@ -59,7 +61,7 @@ async def get_response_turbo(message):
         stop=None)
     return response
 
-
+#飞书专用请求
 async def completions_turbo(message, retry):  # GPT3.5 turbo  feishu
     data = await get_response_turbo(message)
     # print(data)
@@ -73,24 +75,26 @@ async def completions_turbo(message, retry):  # GPT3.5 turbo  feishu
     return data["choices"][0]["message"]["content"]
 
 
+#web 非stream流
 async def web_completions_turbo(message):
-    response = openai.ChatCompletion.create(
-        engine="gpt35-turbo",
+    response = await openai.ChatCompletion.acreate(
+        engine=aip_engine,
         messages=message.messages,
         temperature=message.temperature,
         max_tokens=message.max_tokens,
         stop=None)
     return response
 
-
+#web stream流
 async def stream_completions_turbo(stream_message: StreamMessageTurbo):
-    response = openai.ChatCompletion.create(
-        engine="gpt35-turbo",
+    response = await openai.ChatCompletion.acreate(
+        engine=aip_engine,
         messages=stream_message.prompt,
         temperature=stream_message.temperature,
         max_tokens=stream_message.max_tokens,
         stream=True,
         stop=None)
     return response
+
 
 
