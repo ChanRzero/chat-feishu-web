@@ -196,7 +196,8 @@ Azure openAI相关变量：
 - `gpt_app_key`  app_key
 - `azure_api_base` api_base
 - `azure_api_type` api_type
-- `azure_api_version` api_version 
+- `azure_api_version` api_version
+- `azure_engine`  api_engine
 
 通用：
 
